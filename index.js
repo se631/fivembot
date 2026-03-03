@@ -21,7 +21,4 @@ client.on('messageCreate', (message) => {
     }
 });
 
-// Yerelde denerken 'TOKEN_BURAYA' kısmına bot tokenini yazabilirsin.
-// Railway'de ise bu otomatik olarak process.env.DISCORD_TOKEN'dan okunacak.
-const TOKEN = "BURAYA_BOT_TOKENINI_YAPISTIR"; 
-client.login(TOKEN);
+client.login(process.env.DISCORD_TOKEN)
