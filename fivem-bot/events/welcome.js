@@ -4,39 +4,50 @@ const config = require('../config.json');
 module.exports = {
     name: 'welcome',
     execute(client) {
-        // --- BİRİ GİRDİĞİNDE ---
+        // SUNUCUYA BİRİ KATILDIĞINDA
         client.on('guildMemberAdd', async (member) => {
             
-            // 1. OTO ROL VERME
-            const otoRol = member.guild.roles.cache.get(config.OTO_ROL_ID);
-            if (otoRol) {
-                await member.roles.add(otoRol).catch(() => {});
+            // 1. OTOMATİK KAYIT (Rolleri Ver)
+            const roller = [config.AILE_ROL_ID, config.OTO_ROL_ID];
+            let rolBilgi = "";
+
+            for (const rolId of roller) {
+                if (!rolId) continue;
+                const role = member.guild.roles.cache.get(rolId);
+                if (role) {
+                    await member.roles.add(role).catch(e => console.log(`Rol verme hatası (${rolId}):`, e));
+                    rolBilgi += `<@&${rolId}> `;
+                }
             }
 
-            // 2. ŞIK GİRİŞ MESAJI (Herkesin gördüğü kanal)
+            // 2. HERKESİN GÖRDÜĞÜ ODAYA ŞIK MESAJ AT
             const hgKanal = member.guild.channels.cache.get(config.GIRIS_CIKIS);
             if (hgKanal) {
                 const hgEmbed = new EmbedBuilder()
-                    .setAuthor({ name: 'Sunucuya Katıldı!', iconURL: member.user.displayAvatarURL() })
-                    .setDescription(`🚀 Merhaba **${member.user.username}**, sunucumuza hoş geldin!\n\n> Seninle birlikte toplam **${member.guild.memberCount}** kişi olduk. ✨`)
-                    .setColor('#2ecc71') // Canlı Yeşil
-                    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 256 }))
-                    .setImage('https://i.imgur.com/your-server-banner.png') // İstersen buraya sunucu banner linki koyabilirsin
-                    .setFooter({ text: `ID: ${member.user.id}`, iconURL: member.guild.iconURL() })
+                    .setAuthor({ name: 'Yeni Bir Üye Katıldı!', iconURL: member.user.displayAvatarURL() })
+                    .setDescription(`🚀 Merhaba ${member}, **Eternal Family** sunucusuna hoş geldin!\n\n🛡️ **Kayıt İşlemi:** Otomatik Tamamlandı\n✅ **Verilen Roller:** ${rolBilgi || "Rol Bulunamadı"}\n\n> Seninle birlikte toplam **${member.guild.memberCount}** kişiyiz.`)
+                    .setColor('#2ecc71')
+                    .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+                    .setFooter({ text: `ID: ${member.user.id}` })
                     .setTimestamp();
 
-                hgKanal.send({ content: `Hoş geldin ${member}! 🎊`, embeds: [hgEmbed] });
+                hgKanal.send({ content: `Hoş geldin ${member}! ✨`, embeds: [hgEmbed] });
             }
+
+            // 3. DM HOŞ GELDİN
+            try {
+                await member.send(`Selam **${member.user.username}**, Eternal Family'ye hoş geldin! Kaydın otomatik yapıldı, iyi eğlenceler.`);
+            } catch (e) { /* DM Kapalıysa hata verme */ }
         });
 
-        // --- BİRİ ÇIKTIĞINDA ---
+        // SUNUCUDAN BİRİ AYRILDIĞINDA
         client.on('guildMemberRemove', async (member) => {
             const bbKanal = member.guild.channels.cache.get(config.GIRIS_CIKIS);
             if (bbKanal) {
                 const bbEmbed = new EmbedBuilder()
                     .setAuthor({ name: 'Sunucudan Ayrıldı', iconURL: member.user.displayAvatarURL() })
-                    .setDescription(`👋 **${member.user.username}** sunucudan ayrıldı.\n\n> Geride **${member.guild.memberCount}** kişi kaldık.`)
-                    .setColor('#e74c3c') // Canlı Kırmızı
+                    .setDescription(`👋 **${member.user.username}** sunucudan ayrıldı. Geride **${member.guild.memberCount}** kişi kaldık.`)
+                    .setColor('#e74c3c')
                     .setTimestamp();
 
                 bbKanal.send({ embeds: [bbEmbed] });
