@@ -44,7 +44,7 @@ module.exports = {
 
         // İlk açılışta ve her 10 dakikada bir çalıştır
         panelGuncelle();
-        setInterval(panelGuncelle, 600000);
+        setInterval(panelGuncelle, 1000);
 
         // Birisi girdiğinde veya çıktığında tetiklenmesi için client üzerinden dinle
         client.on('guildMemberAdd', () => panelGuncelle());
