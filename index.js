@@ -1,4 +1,15 @@
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, REST, Routes, SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
+const { 
+    Client, 
+    GatewayIntentBits, 
+    ActionRowBuilder, 
+    ButtonBuilder, 
+    ButtonStyle, 
+    EmbedBuilder, 
+    REST, 
+    Routes, 
+    SlashCommandBuilder, 
+    PermissionFlagsBits 
+} = require('discord.js');
 
 const client = new Client({
     intents: [
@@ -9,69 +20,107 @@ const client = new Client({
     ]
 });
 
-const YETKILI_KANAL_ID = "BURAYA_KANAL_ID_YAZ"; 
+// --- AYARLAR ---
+const YETKILI_KANAL_ID = "1478500733576806664"; 
+const TOKEN = process.env.DISCORD_TOKEN;
 
-// KOMUTLAR
+// --- SLASH KOMUT TANIMLARI ---
 const commands = [
     new SlashCommandBuilder()
         .setName('kayit-sistemi')
-        .setDescription('Kayıt butonunu gönderir.')
+        .setDescription('Kayıt butonunun olduğu mesajı gönderir.')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
+    
     new SlashCommandBuilder()
         .setName('sil')
-        .setDescription('Mesajları temizler.')
-        .addIntegerOption(opt => opt.setName('miktar').setDescription('1-100 arası').setRequired(true))
-        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages),
-    new SlashCommandBuilder()
-        .setName('ping')
-        .setDescription('Botun hızını ölçer.')
-].map(cmd => cmd.toJSON());
+        .setDescription('Belirtilen miktarda mesajı siler.')
+        .addIntegerOption(option => 
+            option.setName('miktar')
+                .setDescription('Silinecek mesaj sayısı (1-100)')
+                .setRequired(true))
+        .setDefaultMemberPermissions(PermissionFlagsBits.ManageMessages)
+].map(command => command.toJSON());
 
-// READY KISMI (Burayı dikkatli güncelle)
+// --- BOT HAZIR OLDUĞUNDA ---
+const rest = new REST({ version: '10' }).setToken(TOKEN);
+
 client.once('ready', async () => {
     try {
-        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-        console.log('🔄 Slash komutları Discord API\'ye gönderiliyor...');
-
-        // Komutları tüm sunuculara (Global) kaydeder
+        console.log('🔄 Slash komutları güncelleniyor...');
         await rest.put(
             Routes.applicationCommands(client.user.id),
             { body: commands },
         );
-
-        console.log(`✅ Başarıyla ${client.user.tag} olarak giriş yapıldı ve komutlar yüklendi!`);
+        console.log(`✅ ${client.user.tag} hazır! Gereksiz komutlar temizlendi.`);
     } catch (error) {
-        console.error("❌ Komut yükleme hatası oluştu:");
-        console.error(error);
+        console.error("❌ Komut yükleme hatası:", error);
     }
 });
 
-// Etkileşimler (Aynı kalıyor)
+// --- ETKİLEŞİMLER ---
 client.on('interactionCreate', async interaction => {
+    // 1. SLASH KOMUTLARI
     if (interaction.isChatInputCommand()) {
-        if (interaction.commandName === 'ping') await interaction.reply('🏓 Pong!');
-        
-        if (interaction.commandName === 'sil') {
+        const { commandName } = interaction;
+
+        if (commandName === 'sil') {
             const miktar = interaction.options.getInteger('miktar');
+            if (miktar < 1 || miktar > 100) return interaction.reply({ content: 'Lütfen 1-100 arası bir sayı girin.', ephemeral: true });
+            
             await interaction.channel.bulkDelete(miktar, true);
-            await interaction.reply({ content: `🧹 ${miktar} mesaj temizlendi.`, ephemeral: true });
+            await interaction.reply({ content: `✅ **${miktar}** adet mesaj temizlendi.`, ephemeral: true });
         }
 
-        if (interaction.commandName === 'kayit-sistemi') {
+        if (commandName === 'kayit-sistemi') {
             const row = new ActionRowBuilder().addComponents(
-                new ButtonBuilder().setCustomId('kayit_btn').setLabel('Aileye Katıl').setStyle(ButtonStyle.Success).setEmoji('⚔️')
+                new ButtonBuilder()
+                    .setCustomId('kayit_btn')
+                    .setLabel('Aileye Katılmak İstiyorum')
+                    .setStyle(ButtonStyle.Success)
+                    .setEmoji('⚔️')
             );
-            const emb = new EmbedBuilder().setTitle('Eternal Family').setDescription('Katılmak için butona bas!').setColor('DarkRed');
-            await interaction.reply({ embeds: [emb], components: [row] });
+
+            const embed = new EmbedBuilder()
+                .setTitle('Eternal Family Kayıt Sistemi')
+                .setDescription('Ailemize katılmak için aşağıdaki butona basarak başvurunuzu iletebilirsiniz.\n\n*Not: Yetkililerimiz size özelden dönüş yapacaktır.*')
+                .setColor('DarkRed')
+                .setFooter({ text: 'Eternal Family | Başvuru Sistemi' });
+
+            await interaction.reply({ embeds: [embed], components: [row] });
         }
     }
 
+    // 2. BUTON ETKİLEŞİMİ (@everyone etiketli)
     if (interaction.isButton() && interaction.customId === 'kayit_btn') {
-        await interaction.reply({ content: 'Başvurunuz iletildi!', ephemeral: true });
-        const kanal = client.channels.cache.get(YETKILI_KANAL_ID);
-        if (kanal) kanal.send({ content: `🔔 **${interaction.user.tag}** aileye katılmak istiyor!` });
-        try { await interaction.user.send("Başvurun alındı, beklemede kal! 🛡️"); } catch (e) {}
+        const user = interaction.user;
+
+        await interaction.reply({ content: '🛡️ Başvurunuz yetkililere iletildi.', ephemeral: true });
+
+        const yetkiliKanali = client.channels.cache.get(YETKILI_KANAL_ID);
+        if (yetkiliKanali) {
+            const bildirimEmbed = new EmbedBuilder()
+                .setTitle('🔔 Yeni Başvuru!')
+                .addFields(
+                    { name: 'Kullanıcı', value: `${user} (${user.tag})`, inline: true },
+                    { name: 'ID', value: `\`${user.id}\``, inline: true }
+                )
+                .setColor('Yellow')
+                .setTimestamp();
+
+            await yetkiliKanali.send({ 
+                content: "@everyone ⚠️ **Yeni bir aile üyesi adayı başvuruda bulundu!**", 
+                embeds: [bildirimEmbed] 
+            });
+        }
+
+        try {
+            await user.send(`Merhaba **${user.username}**, Eternal Family başvurunuz alındı. Beklemede kalın! 🛡️`);
+        } catch (e) {
+            console.log("DM kapalı.");
+        }
     }
 });
 
-client.login(process.env.DISCORD_TOKEN);
+client.login(TOKEN).catch(err => {
+    console.error("❌ Giriş başarısız!");
+});
