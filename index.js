@@ -4,20 +4,24 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMembers
     ]
 });
 
 client.once('ready', () => {
-    console.log(`🤖 Bot ${client.user.tag} olarak giriş yaptı!`);
+    console.log(`✅ Başarılı! Bot ${client.user.tag} olarak aktif.`);
 });
 
-// Basit bir selamlaşma komutu
 client.on('messageCreate', (message) => {
-    if (message.content === '!aile') {
-        message.reply('Burası bizim ailemiz, burada saygı esastır! 🛡️');
+    if (message.author.bot) return;
+
+    if (message.content === '!ping') {
+        message.reply('Pong! 🏓 Aile botu çalışıyor!');
     }
 });
 
-// Railway'de TOKEN'ı ortam değişkeni (Environment Variable) olarak tanımlayacağız
-client.login(process.env.DISCORD_TOKEN);
+// Yerelde denerken 'TOKEN_BURAYA' kısmına bot tokenini yazabilirsin.
+// Railway'de ise bu otomatik olarak process.env.DISCORD_TOKEN'dan okunacak.
+const TOKEN = "BURAYA_BOT_TOKENINI_YAPISTIR"; 
+client.login(TOKEN);
