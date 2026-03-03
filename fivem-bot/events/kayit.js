@@ -9,16 +9,17 @@ module.exports = {
 
             const kanal = client.channels.cache.get(config.KAYIT_LOG);
             if (kanal) {
-                const bEmbed = new EmbedBuilder()
-                    .setTitle('⚔️ Yeni Başvuru!')
+                const embed = new EmbedBuilder()
+                    .setTitle('⚔️ Yeni Kayıt Başvurusu!')
+                    .setColor('#f1c40f')
                     .addFields(
                         { name: 'Kullanıcı', value: `${interaction.user.tag}`, inline: true },
                         { name: 'ID', value: `\`${interaction.user.id}\``, inline: true }
                     )
-                    .setColor('#f1c40f').setTimestamp();
-                await kanal.send({ content: "@everyone", embeds: [bEmbed] });
+                    .setTimestamp();
+                await kanal.send({ content: "@everyone", embeds: [embed] });
             }
-            await interaction.reply({ content: '✅ Başvurunuz iletildi.', ephemeral: true });
+            await interaction.reply({ content: '✅ Başvurunuz yetkililere iletildi.', ephemeral: true });
         });
     }
 };
