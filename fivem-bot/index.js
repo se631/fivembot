@@ -18,7 +18,7 @@ const client = new Client({
 client.commands = new Collection();
 const TOKEN = process.env.DISCORD_TOKEN;
 
-// Komutları Hafızaya Yükle
+
 const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
@@ -70,3 +70,4 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(TOKEN);
+
