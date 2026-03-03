@@ -9,29 +9,30 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences
+        GatewayIntentBits.GuildPresences,
+        GatewayIntentBits.GuildVoiceStates
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Member, Partials.User]
 });
 
 client.commands = new Collection();
-const TOKEN = process.env.DISCORD_TOKEN; // Eğer ortam değişkeni kullanmıyorsan buraya direkt "TOKEN" yazabilirsin
+const TOKEN = process.env.DISCORD_TOKEN;
 
-// Komutları Yükle
+// Komutları Hafızaya Yükle
+const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
-    const commandsJSON = [];
     for (const file of commandFiles) {
         const command = require(path.join(commandsPath, file));
         if (command.data && command.execute) {
             client.commands.set(command.data.name, command);
-            commandsJSON.push(command.data.toJSON());
+            commands.push(command.data.toJSON());
         }
     }
 }
 
-// Eventleri (Stats, Logs, Kayıt) Yükle
+// Eventleri (Stats, Welcome, VoiceCount vb.) Yükle
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -44,17 +45,28 @@ if (fs.existsSync(eventsPath)) {
 client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} Aktif!`);
     client.user.setActivity('Eternal Family', { type: ActivityType.Playing });
-    
+
+    // Komutları Discord API'ye Kaydet (Refresh)
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
-        await rest.put(Routes.applicationCommands(client.user.id), { body: [] }); // Komutları her ihtimale karşı tazeler
-    } catch (e) { console.error(e); }
+        console.log('🔄 Slash komutları güncelleniyor...');
+        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
+        console.log('🚀 Slash komutları başarıyla kaydedildi!');
+    } catch (error) {
+        console.error('❌ Komut kaydedilirken hata oluştu:', error);
+    }
 });
 
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
-    if (command) try { await command.execute(interaction); } catch (e) { console.error(e); }
+    if (!command) return;
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        await interaction.reply({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
+    }
 });
 
 client.login(TOKEN);
