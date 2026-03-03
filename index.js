@@ -17,17 +17,17 @@ const client = new Client({
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers, // Üyeleri çekmek için şart
+        GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildPresences
     ],
-    partials: [Partials.Member, Partials.User, Partials.GuildMember] // Eksik verileri tamamlamak için
+    partials: [Partials.Member, Partials.User, Partials.GuildMember]
 });
 
 // --- AYARLAR ---
-const YETKILI_KANAL_ID = "1478500733576806664"; 
+const YETKILI_KANAL_ID = "1478500733576806664"; // Verdiğin ID eklendi
 const TOKEN = process.env.DISCORD_TOKEN;
 
-// --- SLASH KOMUT TANIMLARI ---
+// --- KOMUT TANIMLARI ---
 const commands = [
     new SlashCommandBuilder()
         .setName('kayit-sistemi')
@@ -42,14 +42,14 @@ const commands = [
 
     new SlashCommandBuilder()
         .setName('dm')
-        .setDescription('Rolden seçilen kişilere DM atar.')
+        .setDescription('Bir roldeki herkese mesaj atar.')
         .addRoleOption(option => 
             option.setName('rol')
                 .setDescription('Mesaj gidecek rolü seçin.')
                 .setRequired(true))
         .addStringOption(option => 
             option.setName('mesaj')
-                .setDescription('Mesajı yazın.')
+                .setDescription('Gönderilecek mesajı yazın.')
                 .setRequired(true))
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
 ].map(command => command.toJSON());
@@ -59,7 +59,7 @@ const rest = new REST({ version: '10' }).setToken(TOKEN);
 client.once('ready', async () => {
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log(`✅ ${client.user.tag} aktif! Komutlar yüklendi.`);
+        console.log(`✅ Eternal Family Botu Hazır!`);
     } catch (error) {
         console.error(error);
     }
@@ -83,46 +83,38 @@ client.on('interactionCreate', async interaction => {
             await interaction.reply({ embeds: [embed], components: [row] });
         }
 
-        // --- DM KOMUTU (GÜNCELLENDİ) ---
         if (commandName === 'dm') {
             const secilenRol = interaction.options.getRole('rol');
             const gonderilecekMesaj = interaction.options.getString('mesaj');
 
-            await interaction.reply({ content: `⌛ **${secilenRol.name}** rolü taranıyor ve mesajlar hazırlanıyor...`, ephemeral: true });
+            await interaction.reply({ content: `⌛ Mesajlar gönderiliyor...`, ephemeral: true });
 
-            // Sunucudaki TÜM üyeleri botun hafızasına (cache) zorla çekiyoruz
+            // Üyeleri zorla çek
             await interaction.guild.members.fetch(); 
-
             const uyeler = interaction.guild.members.cache.filter(m => m.roles.cache.has(secilenRol.id) && !m.user.bot);
             
-            if (uyeler.size === 0) {
-                return interaction.editReply({ content: `❌ Bu rolde (@${secilenRol.name}) gönderilecek kimse bulunamadı.` });
-            }
-
             let basarili = 0;
             let hatali = 0;
 
             for (const [id, member] of uyeler) {
                 try {
-                    await member.send(`🔔 **Eternal Family Duyurusu**\n\n${gonderilecekMesaj}`);
+                    await member.send(`🔔 **Duyuru:**\n${gonderilecekMesaj}`);
                     basarili++;
                 } catch (e) {
                     hatali++;
                 }
             }
-
-            await interaction.editReply({ 
-                content: `✅ İşlem bitti!\n📤 Gönderilen: ${basarili}\n❌ Kapalı DM: ${hatali}`, 
-            });
+            await interaction.editReply({ content: `✅ İşlem bitti! Başarılı: ${basarili} | Hatalı: ${hatali}` });
         }
     }
 
+    // KAYIT BUTONU (@everyone)
     if (interaction.isButton() && interaction.customId === 'kayit_btn') {
         await interaction.reply({ content: '🛡️ Başvurunuz iletildi.', ephemeral: true });
-        const yetkiliKanali = client.channels.cache.get(YETKILI_KANAL_ID);
-        if (yetkiliKanali) {
+        const kanal = client.channels.cache.get(YETKILI_KANAL_ID);
+        if (kanal) {
             const bEmbed = new EmbedBuilder().setTitle('🔔 Yeni Başvuru!').setDescription(`${interaction.user.tag} başvuru yaptı.`).setColor('Yellow');
-            await yetkiliKanali.send({ content: "@everyone ⚠️ Yeni başvuru!", embeds: [bEmbed] });
+            await kanal.send({ content: "@everyone ⚠️ Yeni başvuru!", embeds: [bEmbed] });
         }
     }
 });
