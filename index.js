@@ -10,7 +10,7 @@ const client = new Client({
 });
 
 // AYARLAR
-const YETKILI_KANAL_ID = "BURAYA_YETKILI_KANAL_ID_YAZ";
+const YETKILI_KANAL_ID = "1476668710793248939";
 const TOKEN = process.env.DISCORD_TOKEN;
 
 // KOMUT TANIMLAMALARI
@@ -114,3 +114,4 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(TOKEN);
+
