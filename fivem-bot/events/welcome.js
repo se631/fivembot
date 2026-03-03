@@ -4,53 +4,47 @@ const config = require('../config.json');
 module.exports = {
     name: 'welcome',
     execute(client) {
-        // SUNUCUYA BİRİ KATILDIĞINDA
         client.on('guildMemberAdd', async (member) => {
             
-            // 1. OTOMATİK KAYIT (Rolleri Ver)
+            // 1. OTOMATİK ROL VERME
             const roller = [config.AILE_ROL_ID, config.OTO_ROL_ID];
-            let rolBilgi = "";
-
             for (const rolId of roller) {
-                if (!rolId) continue;
-                const role = member.guild.roles.cache.get(rolId);
-                if (role) {
-                    await member.roles.add(role).catch(e => console.log(`Rol verme hatası (${rolId}):`, e));
-                    rolBilgi += `<@&${rolId}> `;
-                }
+                if (rolId) await member.roles.add(rolId).catch(() => {});
             }
 
-            // 2. HERKESİN GÖRDÜĞÜ ODAYA ŞIK MESAJ AT
+            // 2. YETKİLİLERE GİDEN "PROFİL FOTOLU" BİLDİRİM (image_52bc47'deki tasarım)
+            const logKanal = member.guild.channels.cache.get(config.IZIN_LOG);
+            if (logKanal) {
+                const basvuruEmbed = new EmbedBuilder()
+                    .setAuthor({ name: 'Yeni bir aile başvurusu geldi!', iconURL: member.guild.iconURL() })
+                    .setTitle('⚔️ Yeni Başvuru!')
+                    .addFields(
+                        { name: 'Kullanıcı', value: `${member} (${member.user.username})`, inline: true },
+                        { name: 'ID', value: `\`${member.id}\``, inline: true }
+                    )
+                    .setColor('#f1c40f')
+                    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 })) // İşte o kedi (Profil Fotoğrafı) buraya geliyor!
+                    .setFooter({ text: `Bugün saat ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` });
+
+                logKanal.send({ content: '@everyone ⚠️ **Yeni bir aile başvurusu geldi!**', embeds: [basvuruEmbed] });
+            }
+
+            // 3. KULLANICIYA ÖZEL DM MESAJI
+            try {
+                await member.send(`Merhaba **${member.user.username}**, Eternal Family başvurunuz yetkililerimize ulaştı. En kısa sürede sizinle iletişime geçeceğiz!`);
+            } catch (e) {
+                // DM Kapalıysa hata vermesin
+            }
+
+            // 4. HERKESİN GÖRDÜĞÜ GİRİŞ MESAJI
             const hgKanal = member.guild.channels.cache.get(config.GIRIS_CIKIS);
             if (hgKanal) {
                 const hgEmbed = new EmbedBuilder()
-                    .setAuthor({ name: 'Yeni Bir Üye Katıldı!', iconURL: member.user.displayAvatarURL() })
-                    .setDescription(`🚀 Merhaba ${member}, **Eternal Family** sunucusuna hoş geldin!\n\n🛡️ **Kayıt İşlemi:** Otomatik Tamamlandı\n✅ **Verilen Roller:** ${rolBilgi || "Rol Bulunamadı"}\n\n> Seninle birlikte toplam **${member.guild.memberCount}** kişiyiz.`)
+                    .setAuthor({ name: 'Sunucuya Katıldı', iconURL: member.user.displayAvatarURL() })
+                    .setDescription(`👋 **${member.user.username}** sunucuya katıldı.\n\n> Seninle birlikte **${member.guild.memberCount}** kişi olduk.`)
                     .setColor('#2ecc71')
-                    .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-                    .setFooter({ text: `ID: ${member.user.id}` })
                     .setTimestamp();
-
-                hgKanal.send({ content: `Hoş geldin ${member}! ✨`, embeds: [hgEmbed] });
-            }
-
-            // 3. DM HOŞ GELDİN
-            try {
-                await member.send(`Selam **${member.user.username}**, Eternal Family'ye hoş geldin! Kaydın otomatik yapıldı, iyi eğlenceler.`);
-            } catch (e) { /* DM Kapalıysa hata verme */ }
-        });
-
-        // SUNUCUDAN BİRİ AYRILDIĞINDA
-        client.on('guildMemberRemove', async (member) => {
-            const bbKanal = member.guild.channels.cache.get(config.GIRIS_CIKIS);
-            if (bbKanal) {
-                const bbEmbed = new EmbedBuilder()
-                    .setAuthor({ name: 'Sunucudan Ayrıldı', iconURL: member.user.displayAvatarURL() })
-                    .setDescription(`👋 **${member.user.username}** sunucudan ayrıldı. Geride **${member.guild.memberCount}** kişi kaldık.`)
-                    .setColor('#e74c3c')
-                    .setTimestamp();
-
-                bbKanal.send({ embeds: [bbEmbed] });
+                hgKanal.send({ embeds: [hgEmbed] });
             }
         });
     }
