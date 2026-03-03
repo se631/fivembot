@@ -9,8 +9,7 @@ const client = new Client({
     ]
 });
 
-// AYARLAR - Burayı kendi kanal ID'n ile değiştir
-const YETKILI_KANAL_ID = "1476668710793248939"; 
+const YETKILI_KANAL_ID = "BURAYA_KANAL_ID_YAZ"; 
 
 // KOMUTLAR
 const commands = [
@@ -28,17 +27,26 @@ const commands = [
         .setDescription('Botun hızını ölçer.')
 ].map(cmd => cmd.toJSON());
 
-const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
-
+// READY KISMI (Burayı dikkatli güncelle)
 client.once('ready', async () => {
     try {
-        await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log(`✅ ${client.user.tag} Slash komutlarıyla hazır!`);
+        const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
+        console.log('🔄 Slash komutları Discord API\'ye gönderiliyor...');
+
+        // Komutları tüm sunuculara (Global) kaydeder
+        await rest.put(
+            Routes.applicationCommands(client.user.id),
+            { body: commands },
+        );
+
+        console.log(`✅ Başarıyla ${client.user.tag} olarak giriş yapıldı ve komutlar yüklendi!`);
     } catch (error) {
-        console.error("Komut yükleme hatası:", error);
+        console.error("❌ Komut yükleme hatası oluştu:");
+        console.error(error);
     }
 });
 
+// Etkileşimler (Aynı kalıyor)
 client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         if (interaction.commandName === 'ping') await interaction.reply('🏓 Pong!');
@@ -66,7 +74,4 @@ client.on('interactionCreate', async interaction => {
     }
 });
 
-// LOGIN - Buradaki process.env.DISCORD_TOKEN kısmına dokunma!
-client.login(process.env.DISCORD_TOKEN).catch(err => {
-    console.error("❌ TOKEN HATASI: Railway Variables kısmını kontrol et!");
-});
+client.login(process.env.DISCORD_TOKEN);
