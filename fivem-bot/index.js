@@ -17,7 +17,7 @@ const client = new Client({
 client.commands = new Collection();
 const TOKEN = process.env.DISCORD_TOKEN;
 
-// --- KOMUTLARI (COMMANDS) YÜKLE ---
+// Komut Yükleme
 const commandsPath = path.join(__dirname, 'commands');
 const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 const commandsJSON = [];
@@ -25,22 +25,21 @@ const commandsJSON = [];
 for (const file of commandFiles) {
     const filePath = path.join(commandsPath, file);
     const command = require(filePath);
-    if ('data' in command && 'execute' in command) {
+    if (command.data && command.execute) {
         client.commands.set(command.data.name, command);
         commandsJSON.push(command.data.toJSON());
     }
 }
 
-// --- ETKİNLİKLERİ (EVENTS) YÜKLE ---
+// Olay (Events) Yükleme - Stats ve Logs burada başlar
 const eventsPath = path.join(__dirname, 'events');
-if (fs.existsSync(eventsPath)) {
-    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
-    for (const file of eventFiles) {
-        const filePath = path.join(eventsPath, file);
-        const event = require(filePath);
-        if (event.execute) {
-            event.execute(client); // stats.js ve logs.js burada otomatik başlar
-        }
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+
+for (const file of eventFiles) {
+    const filePath = path.join(eventsPath, file);
+    const event = require(filePath);
+    if (event.execute) {
+        event.execute(client);
     }
 }
 
@@ -49,29 +48,16 @@ client.once('ready', async () => {
     try {
         await rest.put(Routes.applicationCommands(client.user.id), { body: commandsJSON });
         client.user.setActivity('Eternal Family', { type: ActivityType.Playing });
-        console.log(`🛡️ Eternal Bot yayında! ${commandFiles.length} komut ve tüm modüller aktif.`);
+        console.log(`✅ Eternal Family: Bot ve Modüller Hazır!`);
     } catch (e) { console.error(e); }
 });
 
-// --- ETKİLEŞİMLER (Sadece Butonlar ve Komut Tetikleyici) ---
 client.on('interactionCreate', async interaction => {
     if (interaction.isChatInputCommand()) {
         const command = client.commands.get(interaction.commandName);
         if (command) try { await command.execute(interaction); } catch (e) { console.error(e); }
     }
-
-    if (interaction.isButton() && interaction.customId === 'kayit_btn') {
-        const { EmbedBuilder } = require('discord.js');
-        const kanal = client.channels.cache.get(config.KAYIT_LOG);
-        if (kanal) {
-            const bEmbed = new EmbedBuilder()
-                .setTitle('⚔️ Yeni Başvuru!')
-                .addFields({ name: 'Kullanıcı', value: `${interaction.user.tag}` }, { name: 'ID', value: `\`${interaction.user.id}\`` })
-                .setColor('Yellow').setTimestamp();
-            await kanal.send({ content: "@everyone", embeds: [bEmbed] });
-        }
-        await interaction.reply({ content: '✅ Başvurunuz iletildi.', ephemeral: true });
-    }
+    // Buton işlemleri buraya gelebilir
 });
 
 client.login(TOKEN);
