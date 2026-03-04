@@ -77,7 +77,7 @@ if (fs.existsSync(eventsPath)) {
 
 client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} Başarıyla Aktif Edildi!`);
-    client.user.setActivity('Eternal Family', { type: ActivityType.Playing });
+    client.user.setActivity('Developed By CyrusFix', { type: ActivityType.Streaming });
 
     // --- SES KANALINA BAĞLANMA ---
     const SES_KANAL_ID = "1478527879762673795"; 
@@ -126,3 +126,4 @@ client.on('interactionCreate', async interaction => {
 });
 
 client.login(TOKEN);
+
