@@ -15,13 +15,12 @@ const client = new Client({
     partials: [Partials.Message, Partials.Channel, Partials.Member, Partials.User]
 });
 
-// --- KRİTİK EKLEME: ÇÖKME KORUMASI ---
-// Botun herhangi bir hatada kapanmasını engeller
+// --- ÇÖKME KORUMASI ---
 process.on('unhandledRejection', error => {
     console.error('🔴 Yakalanmayan Vaat Reddi:', error);
 });
 process.on('uncaughtException', error => {
-    console.error('🔴 Kritik İstisna (Bot Kapatılmadı):', error);
+    console.error('🔴 Kritik İstisna:', error);
 });
 
 client.commands = new Collection();
@@ -35,20 +34,10 @@ if (fs.existsSync(commandsPath)) {
     for (const file of commandFiles) {
         const filePath = path.join(commandsPath, file);
         const command = require(filePath);
-        
         if (command && command.data && command.execute) {
-            try {
-                const commandJSON = command.data.toJSON();
-                if (!commandJSON.name || !commandJSON.description) {
-                    console.log(`⚠️ [HATA] ${file} dosyasında isim veya açıklama eksik!`);
-                    continue;
-                }
-                client.commands.set(command.data.name, command);
-                commands.push(commandJSON);
-                console.log(`📡 Komut Yüklendi: ${commandJSON.name}`);
-            } catch (error) {
-                console.log(`⚠️ [HATA] ${file} dosyası işlenirken hata oluştu:`, error.message);
-            }
+            client.commands.set(command.data.name, command);
+            commands.push(command.data.toJSON());
+            console.log(`📡 Komut Yüklendi: ${command.data.name}`);
         }
     }
 }
@@ -59,25 +48,25 @@ if (fs.existsSync(eventsPath)) {
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
     for (const file of eventFiles) {
         const filePath = path.join(eventsPath, file);
-        try {
-            const event = require(filePath);
-            // Senin sistemine uygun event tetikleyici
-            if (event.name) {
-                client.on(event.name, (...args) => event.execute(...args, client));
-                console.log(`⭐ Event Yüklendi: ${event.name} (${file})`);
-            } else if (event.execute) {
-                // Eğer direkt execute export edildiyse (Senin ticketsystem.js gibi)
-                event.execute(client);
-            }
-        } catch (error) {
-            console.error(`❌ Event dosyası yüklenirken hata (${file}):`, error);
+        const event = require(filePath);
+        if (event.name) {
+            client.on(event.name, (...args) => event.execute(...args, client));
+            console.log(`⭐ Event Yüklendi: ${event.name} (${file})`);
+        } else if (event.execute) {
+            // Bazı sistemler (Ticket vb.) direkt execute bekler
+            event.execute(client);
         }
     }
 }
 
 client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} Başarıyla Aktif Edildi!`);
-    client.user.setActivity('Developed By CyrusFix', { type: ActivityType.Streaming });
+    
+    // Yayıncı statüsü için URL şarttır, yoksa hata alabilirsin
+    client.user.setActivity('Developed By CyrusFix', { 
+        type: ActivityType.Streaming,
+        url: 'https://www.twitch.tv/discord' 
+    });
 
     // --- SES KANALINA BAĞLANMA ---
     const SES_KANAL_ID = "1478527879762673795"; 
@@ -93,37 +82,46 @@ client.once('ready', async () => {
                 selfDeaf: true,
                 selfMute: false
             });
-            console.log('🎤 Bot ses kanalına giriş yaptı ve mikrofonu açtı!');
+            console.log('🎤 Bot ses kanalına giriş yaptı!');
         } catch (error) {
-            console.error('❌ Ses kanalına girerken hata:', error);
+            console.error('❌ Ses hatası:', error);
         }
     }
 
-    // --- SLASH KOMUTLARI KAYDETME ---
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
-        console.log('🔄 Slash komutları Discord API\'ye gönderiliyor...');
         await rest.put(Routes.applicationCommands(client.user.id), { body: commands });
-        console.log('🚀 Slash komutları başarıyla senkronize edildi!');
+        console.log('🚀 Slash komutları senkronize edildi!');
     } catch (error) {
-        console.error('❌ Komut kaydedilirken hata oluştu:', error);
+        console.error('❌ Slash hatası:', error);
     }
 });
 
-// --- ETKİLEŞİM YÖNETİMİ ---
+// --- ETKİLEŞİM YÖNETİMİ (BUTONLAR VE KOMUTLAR) ---
 client.on('interactionCreate', async interaction => {
-    if (!interaction.isChatInputCommand()) return;
-    const command = client.commands.get(interaction.commandName);
-    if (!command) return;
-    try {
-        await command.execute(interaction);
-    } catch (error) {
-        console.error(`❌ Komut Hatası (${interaction.commandName}):`, error);
-        if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
+    // 1. Slash Komutları
+    if (interaction.isChatInputCommand()) {
+        const command = client.commands.get(interaction.commandName);
+        if (!command) return;
+        try {
+            await command.execute(interaction);
+        } catch (error) {
+            console.error(error);
+            if (!interaction.replied) await interaction.reply({ content: 'Hata oluştu!', ephemeral: true });
         }
+    }
+
+    // 2. Butonlar (Kayıt, Ticket vb. için burası şart!)
+    if (interaction.isButton()) {
+        // Buton etkileşimlerini events içindeki dosyalara paslarız
+        // Eğer ayrı bir dosyan yoksa buton ID'sine göre burada işlem yapabilirsin
+        console.log(`🔘 Butona Basıldı: ${interaction.customId}`);
+        
+        // Örnek: Kayıt butonu ise ilgili eventi manuel tetikle (eğer otomatik tetiklenmiyorsa)
+        const kayitEvent = client.actions?.get('kayit'); 
+        // Not: Kayıt butonunun çalışması için events/kayit.js içinde 
+        // interactionCreate isminde bir event olmalı.
     }
 });
 
 client.login(TOKEN);
-
