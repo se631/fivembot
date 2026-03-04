@@ -1,51 +1,61 @@
 const config = require('../config.json');
 
 module.exports = {
-    name: 'ready', // 'stats' yerine 'ready' yaparak bot açıldığında 1 kez başlamasını sağladık
+    name: 'ready',
     async execute(client) {
         async function panelGuncelle() {
-            // Config'de SUNUCU_ID varsa onu kullan, yoksa ilk sunucuyu al
             const guild = client.guilds.cache.get(config.SUNUCU_ID) || client.guilds.cache.first();
             if (!guild) return;
 
             try {
-                // Üyeleri güncel olarak çek
+                // Bilgileri tazeleyelim
                 await guild.members.fetch();
 
-                // 1. Tarih Güncelleme
+                // 1. TARİH KANALI
                 const tarihKanal = guild.channels.cache.get(config.KANAL_TARIKH);
                 if (tarihKanal) {
                     const simdi = new Date();
                     const gun = String(simdi.getDate()).padStart(2, '0');
                     const ay = String(simdi.getMonth() + 1).padStart(2, '0');
                     const yeniIsim = `📅 Tarih: ${gun}.${ay}.${simdi.getFullYear()}`;
-                    if (tarihKanal.name !== yeniIsim) await tarihKanal.setName(yeniIsim).catch(e => console.error("Tarih Hatası:", e));
+                    
+                    // Sadece isim farklıysa güncelle (Rate limit yememek için kritik)
+                    if (tarihKanal.name !== yeniIsim) {
+                        await tarihKanal.setName(yeniIsim).catch(err => console.log("Kanal ismi değiştirme sınırı (Tarih)"));
+                    }
                 }
 
-                // 2. Aktif Üye Güncelleme
+                // 2. AKTİF ÜYE KANALI
                 const aktifKanal = guild.channels.cache.get(config.KANAL_AKTIF);
                 if (aktifKanal) {
-                    // Presence intent açık olmalı!
-                    const aktifSayisi = guild.members.cache.filter(m => m.presence && (m.presence.status === 'online' || m.presence.status === 'idle' || m.presence.status === 'dnd')).size;
+                    const aktifSayisi = guild.members.cache.filter(m => m.presence && (m.presence.status !== 'offline')).size;
                     const yeniIsim = `🟢 Aktif: ${aktifSayisi}`;
-                    if (aktifKanal.name !== yeniIsim) await aktifKanal.setName(yeniIsim).catch(e => console.error("Aktif Hatası:", e));
+                    
+                    if (aktifKanal.name !== yeniIsim) {
+                        await aktifKanal.setName(yeniIsim).catch(err => console.log("Kanal ismi değiştirme sınırı (Aktif)"));
+                    }
                 }
 
-                // 3. Toplam Üye (Belirli Rolü Olanlar)
+                // 3. TOPLAM ÜYE KANALI
                 const toplamKanal = guild.channels.cache.get(config.KANAL_TOPLAM);
                 if (toplamKanal) {
                     const aileUyeSayisi = guild.members.cache.filter(m => m.roles.cache.has(config.AILE_ROL_ID)).size;
-                    const yeniIsim = `⚔️ Toplam Üye: ${aileUyeSayisi}`;
-                    if (toplamKanal.name !== yeniIsim) await toplamKanal.setName(yeniIsim).catch(e => console.error("Toplam Hatası:", e));
+                    const yeniIsim = `⚔️ Toplam: ${aileUyeSayisi}`;
+                    
+                    if (toplamKanal.name !== yeniIsim) {
+                        await toplamKanal.setName(yeniIsim).catch(err => console.log("Kanal ismi değiştirme sınırı (Toplam)"));
+                    }
                 }
-            } catch (err) { 
-                console.error("Panel güncellenirken hata oluştu:", err); 
+
+            } catch (err) {
+                console.error("Panel Hatası:", err.message);
             }
         }
 
-        // ÖNEMLİ: Discord kanal isimlerini değiştirmek için 10 saniye çok hızlıdır. 
-        // Rate limit yiyip botun durmaması için bunu 10 dakikaya (600000 ms) çekmeni öneririm.
-        setInterval(panelGuncelle, 6000); 
-        panelGuncelle(); // Bot açıldığında hemen bir kere çalıştır
+        // 12 dakikada bir güncelle (720000 ms) - En güvenli süre budur.
+        setInterval(panelGuncelle, 720000); 
+        
+        // Bot açıldıktan 5 saniye sonra ilk güncellemeyi yap
+        setTimeout(panelGuncelle, 5000);
     }
 };
