@@ -1,5 +1,5 @@
 const { Client, GatewayIntentBits, Collection, Partials, ActivityType } = require('discord.js');
-const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice'); // Status kontrolü eklendi
+const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
@@ -54,13 +54,14 @@ client.on('interactionCreate', async interaction => {
     try { await command.execute(interaction); } catch (e) { console.error(e); }
 });
 
-// 4. SESE GİRİŞ FONKSİYONU (DÜŞERSE GERİ GİRER)
-function connectToVoice() {
-    const guild = client.guilds.cache.get(config.GUILD_ID);
-    if (!guild) return console.log("❌ Sunucu bulunamadı.");
+// 4. SESE GİRİŞ FONKSİYONU (DÖNGÜLÜ VE GARANTİ)
+const connectToVoice = async () => {
+    // Sunucuyu çek (Fetch kullanarak cache sorununu çözeriz)
+    const guild = await client.guilds.fetch(config.GUILD_ID).catch(() => null);
+    if (!guild) return console.log("❌ Sunucu hala bulunamadı, 5 saniye sonra tekrar denenecek...");
 
     const channel = guild.channels.cache.get(config.BOT_SES_KANAL_ID);
-    if (!channel) return console.log("❌ Ses kanalı bulunamadı.");
+    if (!channel) return console.log("❌ Ses kanalı bulunamadı, ID'yi kontrol et!");
 
     try {
         const connection = joinVoiceChannel({
@@ -72,21 +73,21 @@ function connectToVoice() {
         });
 
         connection.on(VoiceConnectionStatus.Disconnected, async () => {
-            console.log("⚠️ Ses bağlantısı koptu, tekrar bağlanılıyor...");
-            setTimeout(connectToVoice, 5000); // 5 saniye sonra tekrar dene
+            console.log("⚠️ Bağlantı koptu, 5 saniye sonra tekrar bağlanılıyor...");
+            setTimeout(connectToVoice, 5000);
         });
 
-        console.log(`🔊 [SES] ${channel.name} kanalına giriş başarılı!`);
+        console.log(`🔊 [SES] "${channel.name}" kanalına başarıyla girildi!`);
     } catch (error) {
-        console.error("❌ Ses giriş hatası:", error);
+        console.error("❌ Ses girişinde teknik hata:", error);
     }
-}
+};
 
 // 5. READY (HAZIR OLDUĞUNDA)
 client.once('ready', () => {
     console.log(`✅ ${client.user.tag} Aktif!`);
     
-    // YAYIN DURUMU
+    // YAYIN DURUMU (Developed By CyrusFix)
     client.user.setPresence({
         activities: [{ 
             name: `Developed By CyrusFix`, 
@@ -96,8 +97,8 @@ client.once('ready', () => {
         status: 'dnd',
     });
 
-    // SESE BAĞLANMA ÇAĞRISI
-    connectToVoice();
+    // Ses girişi için 3 saniye bekle (Discord verilerinin tam oturması için)
+    setTimeout(connectToVoice, 3000);
 });
 
 // 6. GİRİŞ
