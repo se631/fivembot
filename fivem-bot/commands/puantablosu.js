@@ -5,7 +5,7 @@ const db = new QuickDB();
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('puantablosu')
-        .setDescription('Mevcut puan ve aktiflik durumunuzu gösterir.'),
+        .setDescription('Aile içindeki aktiflik ve puan durumunu gösterir.'),
     async execute(interaction) {
         const user = interaction.user;
         const puan = await db.get(`puan_${user.id}`) || 0;
@@ -13,15 +13,15 @@ module.exports = {
         const ses = await db.get(`voice_minutes_${user.id}`) || 0;
 
         const embed = new EmbedBuilder()
-            .setAuthor({ name: `${user.username} - Aktiflik Özeti`, iconURL: user.displayAvatarURL() })
-            .setColor('#f1c40f') // Altın Sarısı
-            .setThumbnail(user.displayAvatarURL())
+            .setTitle('🛡️ Eternal Family | Üye Profili')
+            .setThumbnail(user.displayAvatarURL({ dynamic: true }))
+            .setColor('#34495e') // Koyu Gri/Mavi
             .addFields(
-                { name: '💰 Toplam Puan', value: `\`${puan}\` Puan`, inline: true },
-                { name: '💬 Toplam Mesaj', value: `\`${mesaj}\` Mesaj`, inline: true },
-                { name: '🎤 Ses Aktifliği', value: `\`${Math.floor(ses / 60)} saat ${ses % 60} dk\``, inline: true }
+                { name: '👤 Kullanıcı', value: `${user.tag}`, inline: true },
+                { name: '💰 Mevcut Puan', value: `\`${puan} Puan\``, inline: true },
+                { name: '📊 İstatistikler', value: `💬 **${mesaj}** Mesaj\n🎤 **${Math.floor(ses / 60)}s ${ses % 60}dk** Ses`, inline: false }
             )
-            .setFooter({ text: 'Eternal Family Gelişim Sistemi' })
+            .setFooter({ text: 'Eternal Family Aktiflik Sistemi' })
             .setTimestamp();
 
         await interaction.reply({ embeds: [embed] });
