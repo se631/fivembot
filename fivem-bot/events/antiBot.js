@@ -47,7 +47,7 @@ module.exports = {
                 await member.guild.members.ban(executor.id, { reason: "Guard: İzinsiz Bot Ekleme" }).catch(() => {});
 
                 // Log Kanalına Bildir
-                const logKanalId = config.GUARD_LOG || config.IZIN_LOG;
+                const logKanalId = config.GUARD_LOG || config.BAN_LOG;
                 const logKanal = member.guild.channels.cache.get(logKanalId);
                 
                 if (logKanal) {
