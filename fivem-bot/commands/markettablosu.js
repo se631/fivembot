@@ -14,7 +14,7 @@ module.exports = {
                 { name: '🎖️ ÖZEL BAĞIŞÇI ROLÜ', value: '└ `200 Puan` \n*1 Hafta boyunca listede en üstte görünürsün.*', inline: false },
                 { name: '🏎️ AİLE ÖZEL ARACI', value: '└ `500 Puan` \n*Sana özel tanımlanmış modifiyeli araç.*', inline: false }
             )
-            .setImage('https://i.imgur.com/uG9X6rE.png') // Buraya varsa aile logonuzu koyabilirsiniz
+            .setImage('https://imgur.com/a/kqusJaY') // Buraya varsa aile logonuzu koyabilirsiniz
             .setFooter({ text: 'Ürün satın almak için yetkililere başvurun.' });
 
         await interaction.reply({ embeds: [embed] });
