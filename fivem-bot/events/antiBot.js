@@ -32,18 +32,23 @@ module.exports = {
                 await member.guild.members.ban(target.id, { reason: "Guard: İzinsiz Bot" }).catch(() => {});
                 await member.guild.members.ban(executor.id, { reason: "Guard: İzinsiz Bot Ekleme" }).catch(() => {});
 
-                // Log kanalına gönder
-                const logKanal = member.guild.channels.cache.get(config.IZIN_LOG);
+                // LOG KANALI DEĞİŞTİRİLDİ: Artık config.GUARD_LOG kullanıyor
+                const logKanalId = config.GUARD_LOG || config.IZIN_LOG; // Eğer GUARD_LOG yoksa hata vermemesi için yedeğe izin logu aldık
+                const logKanal = member.guild.channels.cache.get(logKanalId);
+                
                 if (logKanal) {
                     const embed = new EmbedBuilder()
-                        .setTitle('🛡️ Guard Sistemi Çalıştı')
+                        .setTitle('🛡️ Guard Sistemi: İzinsiz Bot Engellendi')
                         .setColor('#ff0000')
                         .addFields(
-                            { name: 'Engellenen Bot', value: `${target.tag}`, inline: true },
-                            { name: 'Sokan Kişi (Banlandı)', value: `${executor.tag}`, inline: true }
+                            { name: 'Engellenen Bot', value: `\`${target.tag}\` (${target.id})`, inline: false },
+                            { name: 'Sokan Kişi (Banlandı)', value: `<@${executor.id}> (\`${executor.tag}\`)`, inline: false },
+                            { name: 'Sebep', value: 'Beyaz listede (whitelist) bulunmayan kullanıcı tarafından bot ekleme girişimi.', inline: false }
                         )
+                        .setFooter({ text: 'Eternal Family Koruma Sistemi' })
                         .setTimestamp();
-                    logKanal.send({ embeds: [embed] });
+                    
+                    logKanal.send({ content: "@everyone", embeds: [embed] });
                 }
             }
         });
