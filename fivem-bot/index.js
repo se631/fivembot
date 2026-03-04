@@ -1,8 +1,7 @@
 const { Client, GatewayIntentBits, Collection, REST, Routes, Partials, ActivityType } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice'); // Ses kütüphanesi eklendi
+const { joinVoiceChannel } = require('@discordjs/voice');
 const fs = require('node:fs');
 const path = require('node:path');
-const config = require('./config.json');
 
 const client = new Client({
     intents: [
@@ -11,7 +10,7 @@ const client = new Client({
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
         GatewayIntentBits.GuildPresences,
-        GatewayIntentBits.GuildVoiceStates // Bu zaten var, ses için şart
+        GatewayIntentBits.GuildVoiceStates 
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Member, Partials.User]
 });
@@ -21,17 +20,32 @@ const TOKEN = process.env.DISCORD_TOKEN;
 
 const commands = [];
 const commandsPath = path.join(__dirname, 'commands');
+
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
     for (const file of commandFiles) {
         const command = require(path.join(commandsPath, file));
-        if (command.data && command.execute) {
-            client.commands.set(command.data.name, command);
-            commands.push(command.data.toJSON());
+        
+        // GÜVENLİK KONTROLÜ: Komutun hem datası hem de execute kısmı var mı bakıyoruz.
+        // Ayrıca description veya name hatası varsa botun çökmesini burada engelliyoruz.
+        if (command && command.data && command.execute) {
+            try {
+                const commandJSON = command.data.toJSON();
+                // Eğer description veya name boş gelirse hatayı burada yakalayacağız
+                if (!commandJSON.name || !commandJSON.description) {
+                    console.log(`⚠️ [HATA] ${file} dosyasında isim veya açıklama eksik!`);
+                    continue;
+                }
+                client.commands.set(command.data.name, command);
+                commands.push(commandJSON);
+            } catch (error) {
+                console.log(`⚠️ [HATA] ${file} dosyası işlenirken hata oluştu:`, error.message);
+            }
         }
     }
 }
 
+// Events yükleme
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -45,7 +59,7 @@ client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} Aktif!`);
     client.user.setActivity('Eternal Family', { type: ActivityType.Playing });
 
-    // --- SES KANALINA BAĞLANMA BÖLÜMÜ ---
+    // --- SES KANALINA BAĞLANMA ---
     const SES_KANAL_ID = "1478527879762673795"; 
     const SUNUCU_ID = "1460662786014314579";
 
@@ -64,8 +78,8 @@ client.once('ready', async () => {
             console.error('❌ Ses kanalına girerken hata:', error);
         }
     }
-    // ------------------------------------
 
+    // Komutları Discord'a kaydetme
     const rest = new REST({ version: '10' }).setToken(TOKEN);
     try {
         console.log('🔄 Slash komutları güncelleniyor...');
@@ -84,7 +98,9 @@ client.on('interactionCreate', async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        await interaction.reply({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
+        if (!interaction.replied) {
+            await interaction.reply({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
+        }
     }
 });
 
