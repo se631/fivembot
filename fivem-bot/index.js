@@ -1,9 +1,10 @@
 const { Client, GatewayIntentBits, Collection, Partials, ActivityType } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice');
+const { joinVoiceChannel, getVoiceConnection } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 
+// 1. BOTU TÜM İZİNLERLE BAŞLAT
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -18,7 +19,7 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// KOMUT VE EVENT YÜKLEME (OTOMATİK)
+// 2. KOMUT VE EVENTLERİ OTOMATİK YÜKLE
 const folders = ['commands', 'events'];
 folders.forEach(folder => {
     const folderPath = path.join(__dirname, folder);
@@ -26,38 +27,48 @@ folders.forEach(folder => {
         const files = fs.readdirSync(folderPath).filter(file => file.endsWith('.js'));
         for (const file of files) {
             const item = require(path.join(folderPath, file));
-            if (folder === 'commands') client.commands.set(item.data.name, item);
-            else client.on(item.name, (...args) => item.execute(...args, client));
+            if (folder === 'commands') {
+                client.commands.set(item.data.name, item);
+            } else {
+                client.on(item.name, (...args) => item.execute(...args, client));
+            }
         }
     }
 });
 
-// SESE GİRİŞ FONKSİYONU
+// 3. SESE GİRİŞ FONKSİYONU (KULAKLIK KAPALI - MİKROFON AÇIK)
 const seseGir = async () => {
     try {
         const guild = await client.guilds.fetch(config.GUILD_ID).catch(() => null);
-        if (!guild) return console.log("❌ Sunucu bulunamadı, ID'yi kontrol et!");
+        if (!guild) return console.log("❌ [HATA] Sunucu ID bulunamadı.");
 
         const channel = guild.channels.cache.get(config.BOT_SES_KANAL_ID);
-        if (!channel) return console.log("❌ Ses kanalı bulunamadı, ID'yi kontrol et!");
+        if (!channel) return console.log("❌ [HATA] Ses kanalı ID bulunamadı.");
+
+        // Eski bağlantıyı temizle (Mikrofon takılı kalmasın)
+        const oldConnection = getVoiceConnection(guild.id);
+        if (oldConnection) oldConnection.destroy();
 
         joinVoiceChannel({
             channelId: channel.id,
             guildId: guild.id,
             adapterCreator: guild.voiceAdapterCreator,
-            selfDeaf: true,
-            selfMute: true
+            selfDeaf: true,  // Kulaklık KAPALI (Kırmızı Çizgili)
+            selfMute: false, // Mikrofon AÇIK (Çizgi Olmayacak)
+            group: client.user.id
         });
-        console.log(`🔊 [SES] ${channel.name} kanalına giriş yapıldı!`);
+
+        console.log(`🔊 [SES] "${channel.name}" kanalına giriş yapıldı. (Kulaklık: Kapalı, Mik: Açık)`);
     } catch (err) {
-        console.error("❌ Ses hatası:", err.message);
+        console.error("❌ [SES HATASI] Giriş yapılamadı:", err.message);
     }
 };
 
+// 4. BOT HAZIR OLDUĞUNDA YAPILACAKLAR
 client.once('ready', () => {
     console.log(`✅ ${client.user.tag} Aktif!`);
     
-    // YAYINDA DURUMU
+    // YAYINDA DURUMU (Developed By CyrusFix)
     client.user.setPresence({
         activities: [{ 
             name: `Developed By CyrusFix`, 
@@ -67,17 +78,23 @@ client.once('ready', () => {
         status: 'dnd',
     });
 
-    // 5 Saniye bekle ve sese gir
+    // 5 saniye bekle ve sese zıpla
     setTimeout(seseGir, 5000);
 });
 
-// TOKEN VE LOGIN
+// 5. SLASH KOMUT DİNLEYİCİ
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        if (!interaction.replied) await interaction.reply({ content: 'Bir hata oluştu!', ephemeral: true });
+    }
+});
+
+// 6. GİRİŞ (RAILWAY TOKEN DESTEĞİ)
 const token = process.env.TOKEN || config.token;
 client.login(token);
-
-// Slash Komut Dinleyici
-client.on('interactionCreate', async i => {
-    if (!i.isChatInputCommand()) return;
-    const cmd = client.commands.get(i.commandName);
-    if (cmd) await cmd.execute(i).catch(() => {});
-});
