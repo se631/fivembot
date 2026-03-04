@@ -1,20 +1,21 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, StringSelectMenuBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('markettablosu')
-        .setDescription('Puanlarınızla alabileceğiniz ürünleri listeler.'),
+        .setDescription('Puan marketindeki ürünleri ve fiyatları listeler.'),
     async execute(interaction) {
         const embed = new EmbedBuilder()
-            .setTitle('🛡️ Eternal Family Aile Marketi')
-            .setDescription('Aktiflik puanlarını kullanarak aşağıdaki ödülleri alabilirsin!')
-            .setColor('#2b2d31')
+            .setTitle('💎 ETERNAL FAMILY - PUAN MARKETİ')
+            .setDescription('Kazandığın puanları burada lüks harcamalara dönüştürebilirsin.')
+            .setColor('#f39c12') // Altın/Turuncu
             .addFields(
-                { name: '🔫 Silah Paketi', value: '`50 Puan` - Temel mühimmat sağlar.', inline: false },
-                { name: '💎 Donate Rolü', value: '`200 Puan` - 1 Haftalık özel rol.', inline: false },
-                { name: '🏎️ Özel Araç', value: '`500 Puan` - Aile içi özel araç kullanımı.', inline: false }
+                { name: '⚔️ SİLAH PAKETİ', value: '└ `50 Puan` \n*Çatışmalar için temel mühimmat sağlar.*', inline: false },
+                { name: '🎖️ ÖZEL BAĞIŞÇI ROLÜ', value: '└ `200 Puan` \n*1 Hafta boyunca listede en üstte görünürsün.*', inline: false },
+                { name: '🏎️ AİLE ÖZEL ARACI', value: '└ `500 Puan` \n*Sana özel tanımlanmış modifiyeli araç.*', inline: false }
             )
-            .setFooter({ text: 'Almak istediğin ürünü yetkililere bildir!' });
+            .setImage('https://i.imgur.com/uG9X6rE.png') // Buraya varsa aile logonuzu koyabilirsiniz
+            .setFooter({ text: 'Ürün satın almak için yetkililere başvurun.' });
 
         await interaction.reply({ embeds: [embed] });
     }
