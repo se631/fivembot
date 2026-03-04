@@ -1,25 +1,24 @@
-const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
+const { Client, GatewayIntentBits, Collection, Partials, ActivityType } = require('discord.js');
+const { joinVoiceChannel } = require('@discordjs/voice'); // Ses kanalına giriş için
 const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 
-// 1. BOTU OLUŞTUR VE GEREKLİ TÜM İZİNLERİ (INTENTS) TANIMLA
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMembers,        // Giriş-Çıkış ve Guard için ŞART
-        GatewayIntentBits.GuildMessages,       // Mesaj sayma ve puan için ŞART
-        GatewayIntentBits.MessageContent,      // Mesaj içeriğini okumak için ŞART
-        GatewayIntentBits.GuildVoiceStates,    // Ses süresi saymak için ŞART
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildVoiceStates,
         GatewayIntentBits.GuildPresences
     ],
     partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User, Partials.GuildMember]
 });
 
-// 2. KOMUTLARI TUTMAK İÇİN KOLEKSİYON OLUŞTUR
 client.commands = new Collection();
 
-// 3. KOMUTLARI (COMMANDS KLASÖRÜ) YÜKLE
+// 1. KOMUTLARI YÜKLE
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -32,7 +31,7 @@ if (fs.existsSync(commandsPath)) {
     }
 }
 
-// 4. OLAYLARI (EVENTS KLASÖRÜ) YÜKLE
+// 2. OLAYLARI YÜKLE
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -47,32 +46,52 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
-// 5. SLASH KOMUTLARINI DİNLE (ETKİLEŞİM YÖNETİMİ)
+// 3. SLASH KOMUT DİNLEYİCİ
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
-
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
-
     try {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        if (interaction.replied || interaction.deferred) {
-            await interaction.followUp({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
-        } else {
-            await interaction.reply({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
+        await interaction.reply({ content: 'Komut çalıştırılırken hata oluştu!', ephemeral: true });
+    }
+});
+
+// 4. BOT HAZIR OLDUĞUNDA (YAYIN VE SESE GİRİŞ)
+client.once('ready', () => {
+    console.log(`✅ ${client.user.tag} Aktif!`);
+
+    // --- YAYINDA DURUMU ---
+    client.user.setPresence({
+        activities: [{ 
+            name: `Developed By CyrusFix`, 
+            type: ActivityType.Streaming, 
+            url: "https://www.twitch.tv/cyrusfix" // Twitch linki şarttır (herhangi bir link olabilir)
+        }],
+        status: 'dnd',
+    });
+
+    // --- SESE GİRİŞ (7/24) ---
+    const botSesKanalId = config.BOT_SES_KANAL_ID; // config.json içine bu ID'yi ekle
+    const guildId = config.GUILD_ID; // config.json içine sunucu ID'sini ekle
+
+    if (botSesKanalId && guildId) {
+        const guild = client.guilds.cache.get(guildId);
+        if (guild) {
+            joinVoiceChannel({
+                channelId: botSesKanalId,
+                guildId: guild.id,
+                adapterCreator: guild.voiceAdapterCreator,
+                selfDeaf: true, // Botun hoparlörü kapalı olsun (kaynak harcamaz)
+                selfMute: true  // Botun mikrofonu kapalı olsun
+            });
+            console.log(`🔊 Bot başarıyla ses kanalına bağlandı.`);
         }
     }
 });
 
-// 6. BOTU ÇALIŞTIR (TOKENİ RAILWAY VEYA CONFIGDEN AL)
-// Railway kullanıyorsan process.env.TOKEN daha sağlıklıdır.
+// 5. LOGIN
 const token = process.env.TOKEN || config.token;
-
-client.login(token).then(() => {
-    console.log(`✅ [SİSTEM] ${client.user.tag} başarıyla aktif edildi!`);
-    console.log(`📈 [VERİ] ${client.commands.size} komut ve ${fs.readdirSync(eventsPath).length} event yüklendi.`);
-}).catch(err => {
-    console.error('❌ [HATA] Bot başlatılamadı:', err);
-});
+client.login(token);
