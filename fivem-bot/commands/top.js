@@ -1,71 +1,91 @@
 const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
-const fs = require('node:fs');
-const path = require('node:path');
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('top')
-        .setDescription('En çok seste vakit geçiren ilk 10 kişiyi gösterir.'),
+        .setDescription('En aktif 10 üyeyi listeler.')
+        .addStringOption(option =>
+            option.setName('tip')
+                .setDescription('Hangi sıralamayı görmek istersiniz?')
+                .setRequired(true)
+                .addChoices(
+                    { name: 'Ses Aktifliği', value: 'voice' },
+                    { name: 'Puan Sıralaması', value: 'point' }
+                )),
+
     async execute(interaction) {
-        // Dosya yolunu kontrol edelim
         const dbPath = path.join(__dirname, '../database.json');
-        
+        const tip = interaction.options.getString('tip');
+
         if (!fs.existsSync(dbPath)) {
             return interaction.reply({ content: '❌ Veritabanı dosyası bulunamadı!', ephemeral: true });
         }
 
         try {
-            // Discord'a "işlem yapıyorum" sinyali gönder (3 saniye sınırını aşmamak için)
+            // "Bot düşünüyor..." durumuna geç (3 saniye sınırını aşmamak için)
             await interaction.deferReply();
 
             const db = JSON.parse(fs.readFileSync(dbPath, 'utf8'));
+            
+            // Veriyi listeye çevir
+            let rawList = Object.entries(db).map(([id, data]) => ({
+                id,
+                voiceTime: data.voiceTime || 0,
+                puan: data.puan || 0,
+                username: data.username || "Bilinmeyen Üye"
+            }));
 
-            // Verileri işle ve sırala
-            const sorted = Object.entries(db)
-                .map(([id, data]) => {
-                    // Eğer data direkt sayıysa veya içindeki voiceTime yoksa 0 kabul et
-                    const vTime = (typeof data === 'object') ? (data.voiceTime || 0) : 0;
-                    return { id, voiceTime: vTime };
-                })
-                .filter(user => user.voiceTime > 0)
-                .sort((a, b) => b.voiceTime - a.voiceTime)
-                .slice(0, 10);
+            let sorted;
+            let title;
+            let footerText;
+
+            if (tip === 'voice') {
+                // Sese göre sırala
+                sorted = rawList.filter(u => u.voiceTime > 0).sort((a, b) => b.voiceTime - a.voiceTime).slice(0, 10);
+                title = '🔊 Eternal Family | Ses Aktifliği';
+                footerText = 'Süreler dakika cinsinden hesaplanmıştır.';
+            } else {
+                // Puana göre sırala
+                sorted = rawList.filter(u => u.puan > 0).sort((a, b) => b.puan - a.puan).slice(0, 10);
+                title = '🏆 Eternal Family | Puan Sıralaması';
+                footerText = 'Puanlar market işlemlerinde kullanılabilir.';
+            }
 
             if (sorted.length === 0) {
-                return interaction.editReply({ content: 'ℹ️ Henüz seste yeterince vakit geçiren kimse yok! (En az 1 dakika gerekiyor)' });
+                return interaction.editReply({ content: 'ℹ️ Listelenecek yeterli veri bulunamadı.' });
             }
 
             const embed = new EmbedBuilder()
-                .setTitle('🔊 Eternal Family Ses Aktifliği')
-                .setColor('#3498db')
+                .setTitle(title)
+                .setColor(tip === 'voice' ? '#3498db' : '#f1c40f')
                 .setThumbnail(interaction.guild.iconURL({ dynamic: true }))
-                .setFooter({ text: 'Süreler toplam aktifliğe göredir.' })
+                .setFooter({ text: footerText })
                 .setTimestamp();
 
             let description = "";
             sorted.forEach((user, index) => {
                 const medal = index === 0 ? "🥇" : (index === 1 ? "🥈" : (index === 2 ? "🥉" : "🔹"));
                 
-                const totalMin = user.voiceTime;
-                const hours = Math.floor(totalMin / 60);
-                const mins = totalMin % 60;
-                const timeStr = hours > 0 ? `\`${hours} saat ${mins} dk\`` : `\`${mins} dk\``;
-
-                description += `${medal} **${index + 1}.** <@${user.id}> - ${timeStr}\n`;
+                if (tip === 'voice') {
+                    const hours = Math.floor(user.voiceTime / 60);
+                    const mins = user.voiceTime % 60;
+                    const timeStr = hours > 0 ? `\`${hours}sa ${mins}dk\`` : `\`${mins}dk\``;
+                    description += `${medal} **${index + 1}.** <@${user.id}> ➔ ${timeStr}\n`;
+                } else {
+                    description += `${medal} **${index + 1}.** <@${user.id}> ➔ \`${user.puan} Puan\`\n`;
+                }
             });
 
             embed.setDescription(description);
-
-            // deferReply kullandığımız için editReply ile gönderiyoruz
             await interaction.editReply({ embeds: [embed] });
 
         } catch (error) {
             console.error('Top komutu hatası:', error);
             if (interaction.deferred) {
-                await interaction.editReply({ content: '❌ Veriler okunurken bir hata oluştu.' });
-            } else {
-                await interaction.reply({ content: '❌ Komut çalıştırılamadı.', ephemeral: true });
+                await interaction.editReply({ content: '❌ Liste hazırlanırken bir hata oluştu.' });
             }
         }
-    },
+    }
 };
