@@ -10,57 +10,61 @@ module.exports = {
             if (!guild) return;
 
             try {
-                // Presence ve Member bilgilerini tazelemek için fetch yapalım
-                // Not: Ana dosyanda GatewayIntentBits.GuildPresences ve GuildMembers olmalı.
-                await guild.members.fetch();
+                // Üye bilgilerini çekelim (Aktiflik ve rol sayımı için şart)
+                await guild.members.fetch({ withPresences: true });
 
-                // 1. TARİH KANALI GÜNCELLEME
+                // --- 1. TARİH KANALI GÜNCELLEME (Türkiye Saati ile) ---
                 const tarihKanal = guild.channels.cache.get(config.KANAL_TARIKH);
                 if (tarihKanal) {
+                    // Türkiye saati (GMT+3) için ayar
                     const simdi = new Date();
-                    // Türkiye saati ve formatı için düzenleme
-                    const gun = String(simdi.getDate()).padStart(2, '0');
-                    const ay = String(simdi.getMonth() + 1).padStart(2, '0');
-                    const yil = simdi.getFullYear();
-                    const yeniIsim = `📅 Tarih: ${gun}.${ay}.${yil}`;
+                    const trTarih = new Intl.DateTimeFormat('tr-TR', {
+                        timeZone: 'Europe/Istanbul',
+                        day: '2-digit',
+                        month: '2-digit',
+                        year: 'numeric'
+                    }).format(simdi);
+
+                    const yeniIsim = `📅 Tarih: ${trTarih}`;
                     
                     if (tarihKanal.name !== yeniIsim) {
-                        await tarihKanal.setName(yeniIsim).catch(() => console.log("⚠️ Tarih kanalı hız sınırına takıldı."));
+                        await tarihKanal.setName(yeniIsim)
+                            .then(() => console.log(`📅 Tarih Güncellendi: ${trTarih}`))
+                            .catch(err => console.log("⚠️ Tarih güncellenemedi (Hız sınırı olabilir)"));
                     }
                 }
 
-                // 2. AKTİF ÜYE KANALI (5 Dakikada bir tetiklenir)
+                // --- 2. AKTİF ÜYE KANALI ---
                 const aktifKanal = guild.channels.cache.get(config.KANAL_AKTIF);
                 if (aktifKanal) {
-                    // Çevrimdışı olmayan (Online, DND, Idle) herkesi sayar
-                    const aktifSayisi = guild.members.cache.filter(m => m.presence && m.presence.status !== 'offline').size;
+                    const aktifSayisi = guild.members.cache.filter(m => m.presence && (m.presence.status !== 'offline' && m.presence.status !== 'invisible')).size;
                     const yeniIsim = `🟢 Aktif: ${aktifSayisi}`;
                     
                     if (aktifKanal.name !== yeniIsim) {
-                        await aktifKanal.setName(yeniIsim).catch(() => console.log("⚠️ Aktif kanalı hız sınırına takıldı."));
+                        await aktifKanal.setName(yeniIsim).catch(() => {});
                     }
                 }
 
-                // 3. TOPLAM ÜYE / AİLE ROLÜ KANALI
+                // --- 3. TOPLAM ÜYE KANALI ---
                 const toplamKanal = guild.channels.cache.get(config.KANAL_TOPLAM);
                 if (toplamKanal) {
                     const aileUyeSayisi = guild.members.cache.filter(m => m.roles.cache.has(config.AILE_ROL_ID)).size;
                     const yeniIsim = `⚔️ Toplam: ${aileUyeSayisi}`;
                     
                     if (toplamKanal.name !== yeniIsim) {
-                        await toplamKanal.setName(yeniIsim).catch(() => console.log("⚠️ Toplam kanalı hız sınırına takıldı."));
+                        await toplamKanal.setName(yeniIsim).catch(() => {});
                     }
                 }
 
             } catch (err) {
-                console.error("❌ Panel Güncelleme Hatası:", err.message);
+                console.error("❌ Panel Hatası:", err.message);
             }
         }
 
-        // İstediğin gibi: 5 dakikada bir güncelleme yapar (300000 ms)
+        // Aktif kullanıcı ve tarih için 5 dakikalık periyot
         setInterval(panelGuncelle, 300000); 
         
-        // Bot açıldıktan 10 saniye sonra ilk verileri yazdır
+        // İlk çalıştırma (10 saniye sonra)
         setTimeout(panelGuncelle, 10000);
     }
 };
