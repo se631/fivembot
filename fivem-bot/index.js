@@ -1,10 +1,9 @@
 const { Client, GatewayIntentBits, Collection, Partials, ActivityType } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice');
+const { joinVoiceChannel, VoiceConnectionStatus } = require('@discordjs/voice'); // Status kontrolü eklendi
 const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 
-// 1. BOTU TÜM YETKİLERLE OLUŞTUR
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -19,7 +18,7 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// 2. KOMUTLARI OTOMATİK YÜKLE
+// 1. KOMUTLARI YÜKLE
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -32,7 +31,7 @@ if (fs.existsSync(commandsPath)) {
     }
 }
 
-// 3. EVENTLERİ OTOMATİK YÜKLE
+// 2. EVENTLERİ YÜKLE
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -47,24 +46,47 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
-// 4. SLASH KOMUT DİNLEYİCİ
+// 3. KOMUT DİNLEME
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
     if (!command) return;
-    try {
-        await command.execute(interaction);
-    } catch (error) {
-        console.error(error);
-        if (!interaction.replied) await interaction.reply({ content: 'Hata oluştu!', ephemeral: true });
-    }
+    try { await command.execute(interaction); } catch (e) { console.error(e); }
 });
 
-// 5. BOT HAZIR OLDUĞUNDA: YAYIN VE SES GİRİŞİ
-client.once('ready', async () => {
-    console.log(`✅ ${client.user.tag} Aktif!`);
+// 4. SESE GİRİŞ FONKSİYONU (DÜŞERSE GERİ GİRER)
+function connectToVoice() {
+    const guild = client.guilds.cache.get(config.GUILD_ID);
+    if (!guild) return console.log("❌ Sunucu bulunamadı.");
 
-    // --- YAYINDA DURUMU ---
+    const channel = guild.channels.cache.get(config.BOT_SES_KANAL_ID);
+    if (!channel) return console.log("❌ Ses kanalı bulunamadı.");
+
+    try {
+        const connection = joinVoiceChannel({
+            channelId: channel.id,
+            guildId: guild.id,
+            adapterCreator: guild.voiceAdapterCreator,
+            selfDeaf: true,
+            selfMute: true
+        });
+
+        connection.on(VoiceConnectionStatus.Disconnected, async () => {
+            console.log("⚠️ Ses bağlantısı koptu, tekrar bağlanılıyor...");
+            setTimeout(connectToVoice, 5000); // 5 saniye sonra tekrar dene
+        });
+
+        console.log(`🔊 [SES] ${channel.name} kanalına giriş başarılı!`);
+    } catch (error) {
+        console.error("❌ Ses giriş hatası:", error);
+    }
+}
+
+// 5. READY (HAZIR OLDUĞUNDA)
+client.once('ready', () => {
+    console.log(`✅ ${client.user.tag} Aktif!`);
+    
+    // YAYIN DURUMU
     client.user.setPresence({
         activities: [{ 
             name: `Developed By CyrusFix`, 
@@ -74,31 +96,10 @@ client.once('ready', async () => {
         status: 'dnd',
     });
 
-    // --- SES KANALINA GİRİŞ (7/24) ---
-    const guild = client.guilds.cache.get(config.GUILD_ID);
-    if (guild) {
-        const voiceChannel = guild.channels.cache.get(config.BOT_SES_KANAL_ID);
-        if (voiceChannel) {
-            try {
-                joinVoiceChannel({
-                    channelId: voiceChannel.id,
-                    guildId: guild.id,
-                    adapterCreator: guild.voiceAdapterCreator,
-                    selfDeaf: true,
-                    selfMute: true
-                });
-                console.log(`🔊 [SES] "${voiceChannel.name}" kanalına giriş yapıldı.`);
-            } catch (err) {
-                console.error("❌ [SES HATASI] Kanala girilemedi:", err);
-            }
-        } else {
-            console.log("❌ [SES HATASI] Ses kanalı ID'si bulunamadı.");
-        }
-    } else {
-        console.log("❌ [SİSTEM] Sunucu ID'si (GUILD_ID) bulunamadı.");
-    }
+    // SESE BAĞLANMA ÇAĞRISI
+    connectToVoice();
 });
 
-// 6. GİRİŞ (RAILWAY TOKEN DESTEĞİ)
+// 6. GİRİŞ
 const token = process.env.TOKEN || config.token;
 client.login(token);
