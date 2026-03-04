@@ -1,9 +1,10 @@
 const { Client, GatewayIntentBits, Collection, Partials, ActivityType } = require('discord.js');
-const { joinVoiceChannel } = require('@discordjs/voice'); // Ses kanalına giriş için
+const { joinVoiceChannel } = require('@discordjs/voice');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config.json');
 
+// 1. BOTU TÜM YETKİLERLE OLUŞTUR
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -18,7 +19,7 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// 1. KOMUTLARI YÜKLE
+// 2. KOMUTLARI OTOMATİK YÜKLE
 const commandsPath = path.join(__dirname, 'commands');
 if (fs.existsSync(commandsPath)) {
     const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
@@ -31,7 +32,7 @@ if (fs.existsSync(commandsPath)) {
     }
 }
 
-// 2. OLAYLARI YÜKLE
+// 3. EVENTLERİ OTOMATİK YÜKLE
 const eventsPath = path.join(__dirname, 'events');
 if (fs.existsSync(eventsPath)) {
     const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
@@ -46,7 +47,7 @@ if (fs.existsSync(eventsPath)) {
     }
 }
 
-// 3. SLASH KOMUT DİNLEYİCİ
+// 4. SLASH KOMUT DİNLEYİCİ
 client.on('interactionCreate', async interaction => {
     if (!interaction.isChatInputCommand()) return;
     const command = client.commands.get(interaction.commandName);
@@ -55,12 +56,12 @@ client.on('interactionCreate', async interaction => {
         await command.execute(interaction);
     } catch (error) {
         console.error(error);
-        await interaction.reply({ content: 'Komut çalıştırılırken hata oluştu!', ephemeral: true });
+        if (!interaction.replied) await interaction.reply({ content: 'Hata oluştu!', ephemeral: true });
     }
 });
 
-// 4. BOT HAZIR OLDUĞUNDA (YAYIN VE SESE GİRİŞ)
-client.once('ready', () => {
+// 5. BOT HAZIR OLDUĞUNDA: YAYIN VE SES GİRİŞİ
+client.once('ready', async () => {
     console.log(`✅ ${client.user.tag} Aktif!`);
 
     // --- YAYINDA DURUMU ---
@@ -68,30 +69,36 @@ client.once('ready', () => {
         activities: [{ 
             name: `Developed By CyrusFix`, 
             type: ActivityType.Streaming, 
-            url: "https://www.twitch.tv/cyrusfix" // Twitch linki şarttır (herhangi bir link olabilir)
+            url: "https://www.twitch.tv/cyrusfix" 
         }],
         status: 'dnd',
     });
 
-    // --- SESE GİRİŞ (7/24) ---
-    const botSesKanalId = config.BOT_SES_KANAL_ID; // config.json içine bu ID'yi ekle
-    const guildId = config.GUILD_ID; // config.json içine sunucu ID'sini ekle
-
-    if (botSesKanalId && guildId) {
-        const guild = client.guilds.cache.get(guildId);
-        if (guild) {
-            joinVoiceChannel({
-                channelId: botSesKanalId,
-                guildId: guild.id,
-                adapterCreator: guild.voiceAdapterCreator,
-                selfDeaf: true, // Botun hoparlörü kapalı olsun (kaynak harcamaz)
-                selfMute: true  // Botun mikrofonu kapalı olsun
-            });
-            console.log(`🔊 Bot başarıyla ses kanalına bağlandı.`);
+    // --- SES KANALINA GİRİŞ (7/24) ---
+    const guild = client.guilds.cache.get(config.GUILD_ID);
+    if (guild) {
+        const voiceChannel = guild.channels.cache.get(config.BOT_SES_KANAL_ID);
+        if (voiceChannel) {
+            try {
+                joinVoiceChannel({
+                    channelId: voiceChannel.id,
+                    guildId: guild.id,
+                    adapterCreator: guild.voiceAdapterCreator,
+                    selfDeaf: true,
+                    selfMute: true
+                });
+                console.log(`🔊 [SES] "${voiceChannel.name}" kanalına giriş yapıldı.`);
+            } catch (err) {
+                console.error("❌ [SES HATASI] Kanala girilemedi:", err);
+            }
+        } else {
+            console.log("❌ [SES HATASI] Ses kanalı ID'si bulunamadı.");
         }
+    } else {
+        console.log("❌ [SİSTEM] Sunucu ID'si (GUILD_ID) bulunamadı.");
     }
 });
 
-// 5. LOGIN
+// 6. GİRİŞ (RAILWAY TOKEN DESTEĞİ)
 const token = process.env.TOKEN || config.token;
 client.login(token);
