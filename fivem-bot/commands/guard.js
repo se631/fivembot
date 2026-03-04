@@ -7,9 +7,18 @@ module.exports = {
         .setName('guard')
         .setDescription('Beyaz listeyi yönetir.')
         .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
-        .addSubcommand(sub => sub.setName('ekle').addUserOption(opt => opt.setName('kişi').setDescription('Eklenecek kişi').setRequired(true)))
-        .addSubcommand(sub => sub.setName('çıkar').addUserOption(opt => opt.setName('kişi').setDescription('Çıkarılacak kişi').setRequired(true)))
-        .addSubcommand(sub => sub.setName('liste').setDescription('Listeyi gösterir')),
+        // 'çıkar' yerine 'cikar', 'kişi' yerine 'kisi' kullanıldı
+        .addSubcommand(sub => 
+            sub.setName('ekle')
+               .setDescription('Listeye yeni birini ekler.')
+               .addUserOption(opt => opt.setName('kisi').setDescription('Eklenecek kişi').setRequired(true)))
+        .addSubcommand(sub => 
+            sub.setName('cikar')
+               .setDescription('Listeden birini çıkarır.')
+               .addUserOption(opt => opt.setName('kisi').setDescription('Çıkarılacak kişi').setRequired(true)))
+        .addSubcommand(sub => 
+            sub.setName('liste')
+               .setDescription('Listeyi gösterir.')),
     
     async execute(interaction) {
         const guardsPath = path.join(__dirname, '../guards.json');
@@ -17,7 +26,8 @@ module.exports = {
         
         let guardsData = JSON.parse(fs.readFileSync(guardsPath, 'utf8'));
         const sub = interaction.options.getSubcommand();
-        const user = interaction.options.getUser('kişi');
+        // Kod içindeki değişken adını da 'kisi' olarak güncelledik
+        const user = interaction.options.getUser('kisi');
 
         if (sub === 'ekle') {
             if (!guardsData.whitelist.includes(user.id)) {
@@ -28,7 +38,7 @@ module.exports = {
             return interaction.reply('Bu kişi zaten listede.');
         }
 
-        if (sub === 'çıkar') {
+        if (sub === 'cikar') {
             guardsData.whitelist = guardsData.whitelist.filter(id => id !== user.id);
             fs.writeFileSync(guardsPath, JSON.stringify(guardsData, null, 2));
             return interaction.reply(`❌ **${user.username}** listeden çıkarıldı.`);
