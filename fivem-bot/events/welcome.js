@@ -13,7 +13,7 @@ module.exports = {
             }
 
             // 2. YETKİLİLERE GİDEN "PROFİL FOTOLU" BİLDİRİM (image_52bc47'deki tasarım)
-            const logKanal = member.guild.channels.cache.get(config.IZIN_LOG);
+            const logKanal = member.guild.channels.cache.get(config.GIRIS_CIKIS);
             if (logKanal) {
                 const basvuruEmbed = new EmbedBuilder()
                     .setAuthor({ name: 'Yeni bir aile başvurusu geldi!', iconURL: member.guild.iconURL() })
