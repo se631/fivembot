@@ -1,59 +1,78 @@
-const { EmbedBuilder, Events } = require('discord.js');
-const config = require('../config.json');
+const { Client, GatewayIntentBits, Collection, Partials } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+const config = require('./config.json');
 
-module.exports = {
-    name: Events.GuildMemberAdd, // Event adını doğrudan buraya yazıyoruz
-    async execute(member) {
-        // Botun kendisi veya başka botlar katıldığında işlem yapma (Guard zaten hallediyor)
-        if (member.user.bot) return;
+// 1. BOTU OLUŞTUR VE GEREKLİ TÜM İZİNLERİ (INTENTS) TANIMLA
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMembers,        // Giriş-Çıkış ve Guard için ŞART
+        GatewayIntentBits.GuildMessages,       // Mesaj sayma ve puan için ŞART
+        GatewayIntentBits.MessageContent,      // Mesaj içeriğini okumak için ŞART
+        GatewayIntentBits.GuildVoiceStates,    // Ses süresi saymak için ŞART
+        GatewayIntentBits.GuildPresences
+    ],
+    partials: [Partials.Message, Partials.Channel, Partials.Reaction, Partials.User, Partials.GuildMember]
+});
 
-        try {
-            // 1. OTOMATİK ROL VERME
-            const roller = [config.AILE_ROL_ID, config.OTO_ROL_ID];
-            for (const rolId of roller) {
-                if (rolId && rolId.length > 5) { // Geçerli bir ID mi kontrolü
-                    await member.roles.add(rolId).catch(err => console.log(`Rol verme hatası (${rolId}):`, err.message));
-                }
-            }
+// 2. KOMUTLARI TUTMAK İÇİN KOLEKSİYON OLUŞTUR
+client.commands = new Collection();
 
-            // 2. YETKİLİLERE GİDEN BİLDİRİM & HERKESİN GÖRDÜĞÜ GİRİŞ MESAJI
-            // Not: İkisi için de config.GIRIS_CIKIS kanalını kullandım.
-            const logKanal = member.guild.channels.cache.get(config.GIRIS_CIKIS);
-            
-            if (logKanal) {
-                // Yetkili Bildirimi (Thumbnail'li)
-                const basvuruEmbed = new EmbedBuilder()
-                    .setAuthor({ name: 'Yeni bir aile başvurusu geldi!', iconURL: member.guild.iconURL() })
-                    .setTitle('⚔️ Yeni Başvuru!')
-                    .addFields(
-                        { name: 'Kullanıcı', value: `${member} (${member.user.username})`, inline: true },
-                        { name: 'ID', value: `\`${member.id}\``, inline: true }
-                    )
-                    .setColor('#f1c40f')
-                    .setThumbnail(member.user.displayAvatarURL({ dynamic: true, size: 512 }))
-                    .setFooter({ text: `Saat: ${new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}` });
-
-                await logKanal.send({ content: '@everyone ⚠️ **Yeni bir aile başvurusu geldi!**', embeds: [basvuruEmbed] });
-
-                // Herkesin Gördüğü Giriş Mesajı
-                const hgEmbed = new EmbedBuilder()
-                    .setAuthor({ name: 'Sunucuya Katıldı', iconURL: member.user.displayAvatarURL() })
-                    .setDescription(`👋 **${member.user.username}** sunucuya katıldı.\n\n> Seninle birlikte **${member.guild.memberCount}** kişi olduk.`)
-                    .setColor('#2ecc71')
-                    .setTimestamp();
-
-                await logKanal.send({ embeds: [hgEmbed] });
-            }
-
-            // 3. KULLANICIYA ÖZEL DM MESAJI
-            try {
-                await member.send(`Merhaba **${member.user.username}**, Eternal Family başvurunuz yetkililerimize ulaştı. En kısa sürede sizinle iletişime geçeceğiz!`);
-            } catch (e) {
-                // Kullanıcının DM'leri kapalıysa botun çökmemesi için boş bırakıyoruz
-            }
-
-        } catch (error) {
-            console.error('Welcome sistemi hatası:', error);
+// 3. KOMUTLARI (COMMANDS KLASÖRÜ) YÜKLE
+const commandsPath = path.join(__dirname, 'commands');
+if (fs.existsSync(commandsPath)) {
+    const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
+    for (const file of commandFiles) {
+        const filePath = path.join(commandsPath, file);
+        const command = require(filePath);
+        if ('data' in command && 'execute' in command) {
+            client.commands.set(command.data.name, command);
         }
     }
-};
+}
+
+// 4. OLAYLARI (EVENTS KLASÖRÜ) YÜKLE
+const eventsPath = path.join(__dirname, 'events');
+if (fs.existsSync(eventsPath)) {
+    const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
+    for (const file of eventFiles) {
+        const filePath = path.join(eventsPath, file);
+        const event = require(filePath);
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args, client));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args, client));
+        }
+    }
+}
+
+// 5. SLASH KOMUTLARINI DİNLE (ETKİLEŞİM YÖNETİMİ)
+client.on('interactionCreate', async interaction => {
+    if (!interaction.isChatInputCommand()) return;
+
+    const command = client.commands.get(interaction.commandName);
+    if (!command) return;
+
+    try {
+        await command.execute(interaction);
+    } catch (error) {
+        console.error(error);
+        if (interaction.replied || interaction.deferred) {
+            await interaction.followUp({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
+        } else {
+            await interaction.reply({ content: 'Komut çalıştırılırken bir hata oluştu!', ephemeral: true });
+        }
+    }
+});
+
+// 6. BOTU ÇALIŞTIR (TOKENİ RAILWAY VEYA CONFIGDEN AL)
+// Railway kullanıyorsan process.env.TOKEN daha sağlıklıdır.
+const token = process.env.TOKEN || config.token;
+
+client.login(token).then(() => {
+    console.log(`✅ [SİSTEM] ${client.user.tag} başarıyla aktif edildi!`);
+    console.log(`📈 [VERİ] ${client.commands.size} komut ve ${fs.readdirSync(eventsPath).length} event yüklendi.`);
+}).catch(err => {
+    console.error('❌ [HATA] Bot başlatılamadı:', err);
+});
