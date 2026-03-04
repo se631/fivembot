@@ -9,9 +9,7 @@
     "discord.js": "^14.14.1",
     "@discordjs/voice": "^0.16.1",
     "libsodium-wrappers": "^0.7.13",
-    "opusscript": "^0.0.8",
-    "fs": "^0.0.1-security",
-    "path": "^0.12.7"
+    "opusscript": "^0.0.8"
   },
   "engines": {
     "node": "18.x"
