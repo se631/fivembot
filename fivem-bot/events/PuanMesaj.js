@@ -1,5 +1,5 @@
-const { QuickDB } = require("quick.db");
-const db = new QuickDB();
+const fs = require('fs');
+const path = require('path');
 
 module.exports = {
     name: 'messageCreate',
@@ -8,22 +8,44 @@ module.exports = {
         if (message.author.bot || !message.guild) return;
 
         const userId = message.author.id;
+        const dbPath = path.join(__dirname, '../database.json');
 
-        // Toplam mesaj sayısını artır (Tabloda görünmesi için)
-        await db.add(`msg_count_total_${userId}`, 1);
+        try {
+            // 1. Veritabanını Oku
+            let db = {};
+            if (fs.existsSync(dbPath)) {
+                const data = fs.readFileSync(dbPath, 'utf8');
+                db = data.trim() ? JSON.parse(data) : {};
+            }
 
-        // Puan için sayaç (Her 10 mesajda 1 puan)
-        let counter = await db.get(`msg_puan_counter_${userId}`) || 0;
-        counter++;
+            // 2. Kullanıcı Verisi Yoksa Oluştur
+            if (!db[userId]) {
+                db[userId] = { 
+                    username: message.author.username, 
+                    puan: 0, 
+                    voiceTime: 0, 
+                    messageCount: 0,
+                    msgCounter: 0 // Puan için sayaç
+                };
+            }
 
-        if (counter >= 10) {
-            await db.add(`puan_${userId}`, 1); // 1 Puan ekle
-            await db.set(`msg_puan_counter_${userId}`, 0); // Sayacı sıfırla
-            
-            // İsteğe bağlı: Kullanıcıya çok nadir bildirim gidebilir veya sessiz kalabilir.
-            console.log(`[PUAN] ${message.author.username} 10 mesajı geçti, 1 puan kazandı.`);
-        } else {
-            await db.set(`msg_puan_counter_${userId}`, counter);
+            // 3. Mesaj Sayılarını Artır
+            db[userId].messageCount = (db[userId].messageCount || 0) + 1;
+            db[userId].msgCounter = (db[userId].msgCounter || 0) + 1;
+            db[userId].username = message.author.username; // Kullanıcı adını güncel tut
+
+            // 4. Puan Kontrolü (Her 10 mesajda 1 puan)
+            if (db[userId].msgCounter >= 10) {
+                db[userId].puan = (db[userId].puan || 0) + 1; // 1 Puan ekle
+                db[userId].msgCounter = 0; // Sayacı sıfırla
+                console.log(`[PUAN] ${message.author.username} 10 mesajı geçti, 1 puan kazandı.`);
+            }
+
+            // 5. Veritabanını Kaydet
+            fs.writeFileSync(dbPath, JSON.stringify(db, null, 4));
+
+        } catch (error) {
+            console.error('Mesaj puan sistemi hatası:', error);
         }
     }
 };
